@@ -24,4 +24,37 @@
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./scripts/run_inference.py <span class="string">&#x27;contigmap.contigs=[150-150]&#x27;</span> inference.output_prefix=test_outputs/test inference.num_designs=10</span><br></pre></td></tr></table></figure>
 <p>生成的蛋白质pdb文件使用Pymol进行可视化之后如下所示：</p>
 <p><img src="/TSLCB.github.io/imgs/rf1.png" alt="Vtuber"></p>
+<h2 id="代码理解"><a href="#代码理解" class="headerlink" title="代码理解"></a>代码理解</h2><p>使用RFDiffusion主要是通过<code>script/run_inference.py</code>这个文件进行的，我们只要理解这个文件的大体流程就可以了，经过我的研究，我认为它可以分为以下几个部分：</p>
+<ul>
+<li>Hydra读取配置文件与Sampler的初始化</li>
+<li>进入设计几个蛋白质的循环，同时进行<code>x</code>与<code>seq</code>的初始化</li>
+<li>进入扩散去噪循环，不断进行自回归迭代</li>
+<li>结果的保存（pdb文件与trb文件）</li>
+</ul>
+<p>以官方的新手教程指令（无条件蛋白质生成）为例子进行分析</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./scripts/run_inference.py <span class="string">&#x27;contigmap.contigs=[150-150]&#x27;</span> inference.output_prefix=test_outputs/test inference.num_designs=10</span><br></pre></td></tr></table></figure>
+<p>它会执行的内容如下：</p>
+<ul>
+<li>初始化conf，将指令中的超参数覆盖原有的conf(这个过程用的Hydra)</li>
+<li>建立<code>SelfConditioning</code>类型的Sampler</li>
+<li>循环10次，每次生成一个无条件蛋白质</li>
+<li>对每个蛋白质，初始化<code>x</code>与<code>seq</code>之后，循环50次</li>
+</ul>
+<p>接下来，我们单独分析每个流程，来搞懂整个过程</p>
+<h3 id="Hydra读取配置文件与Sampler的初始化"><a href="#Hydra读取配置文件与Sampler的初始化" class="headerlink" title="Hydra读取配置文件与Sampler的初始化"></a>Hydra读取配置文件与Sampler的初始化</h3><p>这个过程做了哪些事情呢？我们来列举一下</p>
+<ul>
+<li>初始化log</li>
+<li>设定随机种子，确保结果可复现</li>
+<li>设定计算设备（cpu or cuda）</li>
+<li>根据conf初始化Sampler</li>
+</ul>
+<p>这个过程其实比较简单，需要注意的就是我发现它一共有3种Sampler</p>
+<p>它们分别是<code>default</code>, <code>SelfConditioning</code>, <code>ScaffoldedSampler</code>。</p>
+<p>而base.yaml中使用的是<code>SelfConditioning</code></p>
+<h3 id="x与seq的初始化"><a href="#x与seq的初始化" class="headerlink" title="x与seq的初始化"></a><code>x</code>与<code>seq</code>的初始化</h3><p>根据我的研究，<code>x</code>与<code>seq</code>分表代表什么东西呢？</p>
+<ul>
+<li><code>x</code>表示蛋白质的原子的3维坐标，它的尺寸为<code>(L, 14, 3)</code>，其中L表示蛋白质的长度</li>
+<li><code>seq</code>表示蛋白质的氨基酸序列，它的尺寸为<code>(L, 22)</code>，注意这里使用了独热编码</li>
+</ul>
+<p>那么它们是如何初始化的呢？</p>
 </div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2025-04-04</span><i class="fa fa-tag"></i></div></div></div></div><div class="share"><div class="evernote"><a class="fa fa-bookmark" href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank"></a></div><div class="weibo"><a class="fa fa-weibo" href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));"></a></div><div class="twitter"><a class="fa fa-twitter" target="_blank" rel="noopener" href="http://twitter.com/home?status=,https://rayburstray.github.io/TSLCB.github.io/2025/04/04/RFDiffusion/,计算生物学大作业,RFDiffusion,;"></a></div></div><div class="pagination"><ul class="clearfix"><li class="next pagbuttons"><a class="btn" role="navigation" href="/TSLCB.github.io/2025/03/31/%E5%86%85%E5%AE%B9%E4%B8%8E%E5%88%86%E5%B7%A5/" title="内容与分工">下一篇</a></li></ul></div></div></div></div></div><script src="/TSLCB.github.io/js/jquery.js"></script><script src="/TSLCB.github.io/js/jquery-migrate-1.2.1.min.js"></script><script src="/TSLCB.github.io/js/jquery.appear.js"></script></body></html>
